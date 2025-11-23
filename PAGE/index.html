@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<title>Loan Eligibility Predictor</title>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
+<style>
+:root {
+  --bg:#0f172a;
+  --panel:#1e293b;
+  --accent:#3b82f6;
+  --accent-hi:#60a5fa;
+  --danger:#dc2626;
+  --ok:#16a34a;
+  --text:#f1f5f9;
+  --muted:#94a3b8;
+  --radius:10px;
+  --shadow:0 8px 24px -6px rgba(0,0,0,.45);
+  --gradient:linear-gradient(135deg,#1e3a8a 0%, #0f766e 50%, #3b82f6 100%);
+}
+* { box-sizing:border-box; }
+body {
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  padding:40px 16px;
+}
+h1 {
+  margin:0 0 24px;
+  font-size:clamp(1.8rem,4vw,2.6rem);
+  background:var(--gradient);
+  -webkit-background-clip:text;
+  color:transparent;
+}
+.container {
+  width:100%;
+  max-width:1100px;
+  display:grid;
+  gap:28px;
+}
+.panel {
+  background:var(--panel);
+  padding:28px 24px 32px;
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  position:relative;
+  overflow:hidden;
+}
+.panel::before {
+  content:"";
+  position:absolute;
+  inset:0;
+  background:
+    radial-gradient(circle at 85% 15%,rgba(255,255,255,.07),transparent 60%),
+    radial-gradient(circle at 15% 85%,rgba(255,255,255,.05),transparent 55%);
+  pointer-events:none;
+}
+form {
+  display:grid;
+  gap:14px;
+  grid-template-columns:repeat(auto-fill,minmax(240px,1fr));
+}
+label {
+  font-size:.75rem;
+  letter-spacing:.05em;
+  text-transform:uppercase;
+  color:var(--muted);
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  font-weight:600;
+}
+input, select {
+  background:#0f1d30;
+  border:1px solid #2f425b;
+  color:var(--text);
+  padding:10px 12px;
+  border-radius:6px;
+  font-size:.95rem;
+  outline:none;
+  transition:.18s border,.18s background;
+}
+input:focus, select:focus {
+  border-color:var(--accent);
+  background:#132338;
+}
+.actions {
+  grid-column:1 / -1;
+  display:flex;
+  flex-wrap:wrap;
+  gap:12px;
+  margin-top:8px;
+}
+button {
+  background:var(--accent);
+  color:var(--text);
+  border:none;
+  padding:12px 20px;
+  font-weight:600;
+  letter-spacing:.5px;
+  border-radius:6px;
+  cursor:pointer;
+  display:inline-flex;
+  gap:8px;
+  align-items:center;
+  box-shadow:0 4px 14px -4px rgba(0,0,0,.6);
+  transition:.18s background,.18s transform;
+}
+button:hover { background:var(--accent-hi); transform:translateY(-2px); }
+button.secondary { background:#334155; }
+button.secondary:hover { background:#475569; }
+.sample-btn { background:#2563eb; }
+.sample-btn:hover { background:#1d4ed8; }
+.output {
+  margin-top:18px;
+  font-size:1.05rem;
+  padding:14px 18px;
+  border-radius:8px;
+  background:#13253b;
+  border:1px solid #1f334b;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  flex-wrap:wrap;
+}
+.badge {
+  padding:4px 10px;
+  border-radius:20px;
+  font-size:.75rem;
+  font-weight:700;
+  letter-spacing:.05em;
+  text-transform:uppercase;
+}
+.badge.ok { background:var(--ok); }
+.badge.bad { background:var(--danger); }
+footer {
+  margin-top:40px;
+  font-size:.7rem;
+  color:var(--muted);
+  letter-spacing:.08em;
+  text-transform:uppercase;
+}
+@media (max-width:640px){
+  .panel { padding:22px 18px 26px; }
+  form { grid-template-columns:1fr 1fr; }
+  h1 { font-size:2rem; }
+}
+@media (max-width:480px){
+  form { grid-template-columns:1fr; }
+  .actions { flex-direction:column; }
+}
+.fade-in {
+  animation:fade .5s ease;
+}
+@keyframes fade { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+</style>
+</head>
+<body>
+<h1>Loan Eligibility Predictor</h1>
+<div class="container">
+  <div class="panel fade-in">
+    <form id="loanForm">
+      <label>No. dependientes
+        <input type="number" id="no_of_dependents" required />
+      </label>
+        <label>Educación
+          <select id="education" required>
+            <option value="" disabled selected>Seleccione...</option>
+            <option value="Graduate">Graduate (Graduado)</option>
+            <option value="Not Graduate">Not Graduate (No graduado)</option>
+          </select>
+        </label>
+        <label>Self Employed
+          <select id="self_employed" required>
+            <option value="" disabled selected>Seleccione...</option>
+            <option value="Yes">Yes (Sí)</option>
+            <option value="No">No</option>
+          </select>
+        </label>
+      <label>Ingreso anual
+        <input type="number" id="income_annum" required />
+      </label>
+      <label>Monto del préstamo
+        <input type="number" id="loan_amount" required />
+      </label>
+      <label>Plazo (meses)
+        <input type="number" id="loan_term" required />
+      </label>
+      <label>CIBIL score
+        <input type="number" id="cibil_score" required />
+      </label>
+      <label>Valor residencial
+        <input type="number" id="residential_assets_value" required />
+      </label>
+      <label>Valor comercial
+        <input type="number" id="commercial_assets_value" required />
+      </label>
+      <label>Valor lujo
+        <input type="number" id="luxury_assets_value" required />
+      </label>
+      <label>Valor banco
+        <input type="number" id="bank_asset_value" required />
+      </label>
+
+      <div class="actions">
+        <button type="submit">Predecir</button>
+        <button type="button" class="sample-btn" onclick="loadSample(1)">Cargar Fila 1 (Datos de prueba)</button>
+        <button type="button" class="sample-btn" onclick="loadSample(2)">Cargar Fila 2 (Datos de prueba)</button>
+        <button type="button" class="sample-btn" onclick="loadSample(3)">Cargar Fila 3 (Datos de prueba)</button>
+        <button type="button" class="secondary" onclick="resetForm()">Limpiar</button>
+      </div>
+    </form>
+
+    <div class="output" id="result">
+      <span>Sin predicción aún.</span>
+    </div>
+  </div>
+</div>
+<footer>Modelo TFJS · Escalado replicado en cliente · Demo</footer>
+
+<script>
+let scalerInfo = null;
+let modelNN = null;
+let modelLogistic = null;
+
+const BASE = './';
+
+const samples = {
+  1: {
+    no_of_dependents:2,
+    education:"Graduate",
+    self_employed:"No",
+    income_annum:9600000,
+    loan_amount:29900000,
+    loan_term:12,
+    cibil_score:778,
+    residential_assets_value:2400000,
+    commercial_assets_value:17600000,
+    luxury_assets_value:22700000,
+    bank_asset_value:8000000
+  },
+  2: {
+    no_of_dependents:0,
+    education:"Not Graduate",
+    self_employed:"Yes",
+    income_annum:4100000,
+    loan_amount:12200000,
+    loan_term:8,
+    cibil_score:417,
+    residential_assets_value:2700000,
+    commercial_assets_value:2200000,
+    luxury_assets_value:8800000,
+    bank_asset_value:3300000
+  },
+  3: {
+    no_of_dependents:3,
+    education:"Graduate",
+    self_employed:"No",
+    income_annum:9100000,
+    loan_amount:29700000,
+    loan_term:20,
+    cibil_score:506,
+    residential_assets_value:7100000,
+    commercial_assets_value:4500000,
+    luxury_assets_value:33300000,
+    bank_asset_value:12800000
+  }
+};
+
+async function init() {
+  const resultEl = document.getElementById('result');
+  try {
+    resultEl.innerHTML = '<span>Cargando modelo(s)...</span>';
+    scalerInfo = await fetch(BASE + 'scaler_info.json').then(r => {
+      if (!r.ok) throw new Error('scaler_info.json HTTP ' + r.status);
+      return r.json();
+    });
+
+    modelLogistic = await tf.loadGraphModel(BASE + 'tfjs_logistic/model.json');
+
+    try {
+      modelNN = await tf.loadGraphModel(BASE + 'tfjs_nn/model.json');
+      console.log('NN cargado');
+    } catch (e) {
+      console.warn('NN no disponible:', e.message);
+    }
+
+    resultEl.innerHTML = '<span>Modelo(s) listo(s). Carga una fila y presiona Predecir.</span>';
+  } catch (e) {
+    console.error(e);
+    resultEl.innerHTML = '<span>Error al cargar recursos: ' + e.message + '</span>';
+  }
+}
+window.addEventListener('load', init);
+
+function predictProbGeneric(m, x) {
+  const y = (typeof m.predict === 'function') ? m.predict(x) : m.execute(x);
+  const t = Array.isArray(y) ? y[0] : y;
+  const val = t.dataSync()[0];
+  tf.dispose(y);
+  const prob = (val < 0 || val > 1) ? 1 / (1 + Math.exp(-val)) : val;
+  return prob;
+}
+
+function encodeCategory(value, classes) {
+  const idx = classes.indexOf(value);
+  if (idx === -1) throw new Error('Valor categórico no visto: ' + value);
+  return idx;
+}
+
+function scaleFeatures(arr) {
+  return arr.map((v, i) => (v - scalerInfo.mean[i]) / scalerInfo.scale[i]);
+}
+
+function loadSample(id) {
+  const s = samples[id];
+  if (!s) return;
+  for (const k in s) {
+    const el = document.getElementById(k);
+    if (el) el.value = s[k];
+  }
+  document.getElementById('education').value = s.education;
+  document.getElementById('self_employed').value = s.self_employed;
+  document.getElementById('result').innerHTML = '<span>Fila ' + id + ' cargada. Listo para predecir.</span>';
+}
+
+function resetForm() {
+  document.getElementById('loanForm').reset();
+  document.getElementById('result').innerHTML = '<span>Formulario limpio.</span>';
+}
+
+document.getElementById('loanForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const resultEl = document.getElementById('result');
+  if (!scalerInfo || (!modelLogistic && !modelNN)) {
+    resultEl.innerHTML = '<span>Modelo(s) aún no listo(s).</span>';
+    return;
+  }
+  try {
+    const eduEnc = encodeCategory(
+      document.getElementById('education').value,
+      scalerInfo.education_classes
+    );
+    const selfEnc = encodeCategory(
+      document.getElementById('self_employed').value,
+      scalerInfo.self_employed_classes
+    );
+    const raw = [
+      parseFloat(document.getElementById('no_of_dependents').value),
+      eduEnc,
+      selfEnc,
+      parseFloat(document.getElementById('income_annum').value),
+      parseFloat(document.getElementById('loan_amount').value),
+      parseFloat(document.getElementById('loan_term').value),
+      parseFloat(document.getElementById('cibil_score').value),
+      parseFloat(document.getElementById('residential_assets_value').value),
+      parseFloat(document.getElementById('commercial_assets_value').value),
+      parseFloat(document.getElementById('luxury_assets_value').value),
+      parseFloat(document.getElementById('bank_asset_value').value)
+    ];
+    if (raw.some(v => Number.isNaN(v))) {
+      resultEl.innerHTML = '<span>Error: Hay campos vacíos o inválidos.</span>';
+      return;
+    }
+
+    const scaled = scaleFeatures(raw);
+    const tensor = tf.tensor2d([scaled], [1, scaled.length]);
+
+    const probs = [];
+    if (modelLogistic) probs.push(predictProbGeneric(modelLogistic, tensor));
+    if (modelNN) probs.push(predictProbGeneric(modelNN, tensor));
+
+    const avgProb = probs.reduce((a, b) => a + b, 0) / probs.length;
+    const eligible = avgProb >= 0.5;
+
+    tensor.dispose();
+
+    const parts = [
+      'Prob. promedio: <strong>' + avgProb.toFixed(4) + '</strong>'
+    ];
+    if (probs.length > 1) {
+      parts.push('(Logistica: ' + probs[0].toFixed(4) + (probs[1] !== undefined ? ', Red Neuronal: ' + probs[1].toFixed(4) : '') + ')');
+    }
+
+    resultEl.innerHTML =
+      '<span>' + parts.join(' ') + '</span>' +
+      '<span class="badge ' + (eligible ? 'ok' : 'bad') + '">' +
+      (eligible ? 'Approved' : 'Rejected') + '</span>';
+  } catch (err) {
+    console.error(err);
+    resultEl.innerHTML = '<span>Error: ' + err.message + '</span>';
+  }
+});
+</script>
+</body>
+</html>
